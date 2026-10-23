@@ -1,0 +1,1 @@
+"""AgentScope background worker package."""

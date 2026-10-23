@@ -1,0 +1,123 @@
+name: agentscope
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: agentscope
+      POSTGRES_PASSWORD: agentscope
+      POSTGRES_DB: agentscope
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentscope -d agentscope"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENTSCOPE_DATABASE_URL: ${AGENTSCOPE_DATABASE_URL:-postgresql+asyncpg://agentscope:agentscope@postgres:5432/agentscope}
+      AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+      AGENTSCOPE_JWT_SECRET: ${AGENTSCOPE_JWT_SECRET:-local-compose-jwt-secret-change-before-sharing}
+      AGENTSCOPE_TOKEN_HASH_SECRET: ${AGENTSCOPE_TOKEN_HASH_SECRET:-local-compose-hash-secret-change-before-sharing}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker-evaluation:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+    command: celery -A agentscope_worker.celery_app worker -Q evaluation -l INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker-experiment:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+    command: celery -A agentscope_worker.celery_app worker -Q experiment,replay -l INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker-general:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+    command: celery -A agentscope_worker.celery_app worker -Q failure_analysis,analytics,alerts,maintenance -l INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  qdrant-data:
+
