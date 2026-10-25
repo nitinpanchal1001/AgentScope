@@ -10,11 +10,30 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
-from agentscope_api.api.routers import auth, health, ingestion, organizations, projects, traces
+from agentscope_api.api.routers import (
+    alerts,
+    analytics,
+    auth,
+    datasets,
+    evaluations,
+    experiments,
+    failures,
+    health,
+    ingestion,
+    maintenance,
+    metrics,
+    organizations,
+    pricing,
+    projects,
+    quality_gates,
+    replays,
+    traces,
+)
 from agentscope_api.core.config import get_settings
 from agentscope_api.core.database import engine
 from agentscope_api.core.exceptions import AppError
 from agentscope_api.core.logging import configure_logging, request_id_context
+from agentscope_api.core.metrics import HTTP_REQUEST_DURATION, HTTP_REQUESTS
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -31,7 +50,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="AgentScope API",
-    version="0.2.0",
+    version="0.11.0",
     description="AgentScope control plane and idempotent telemetry ingestion API.",
     lifespan=lifespan,
     docs_url="/docs" if settings.environment != "production" else None,
@@ -56,6 +75,7 @@ async def request_context(
     request.state.request_id = request_id
     token = request_id_context.set(request_id)
     started = time.perf_counter()
+    response_status = 500
     try:
         try:
             response = await call_next(request)
@@ -73,6 +93,7 @@ async def request_context(
                 },
             )
         response.headers["X-Request-ID"] = request_id
+        response_status = response.status_code
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -81,12 +102,17 @@ async def request_context(
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
     finally:
+        duration = time.perf_counter() - started
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", "unmatched")
+        HTTP_REQUESTS.labels(request.method, route_path, str(response_status)).inc()
+        HTTP_REQUEST_DURATION.labels(request.method, route_path).observe(duration)
         logger.info(
             "request.completed",
             extra={
                 "method": request.method,
                 "path": request.url.path,
-                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                "duration_ms": round(duration * 1000, 2),
             },
         )
         request_id_context.reset(token)
@@ -127,8 +153,24 @@ async def validation_error_handler(request: Request, error: RequestValidationErr
 
 
 app.include_router(health.router)
+app.include_router(metrics.router)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(traces.router, prefix="/api/v1")
+app.include_router(pricing.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(alerts.router, prefix="/api/v1")
+app.include_router(evaluations.router, prefix="/api/v1")
+app.include_router(datasets.router, prefix="/api/v1")
+app.include_router(experiments.router, prefix="/api/v1")
+app.include_router(failures.router, prefix="/api/v1")
+app.include_router(quality_gates.router, prefix="/api/v1")
+app.include_router(replays.router, prefix="/api/v1")
 app.include_router(ingestion.router)
+app.include_router(evaluations.internal_router)
+app.include_router(experiments.internal_router)
+app.include_router(replays.internal_router)
+app.include_router(failures.internal_router)
+app.include_router(alerts.internal_router)
+app.include_router(maintenance.internal_router)

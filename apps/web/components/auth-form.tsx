@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { apiFetch, type AuthResponse } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { ThemeToggle } from "./theme-provider";
 import { Button, Card, FieldError, Input, Label } from "./ui";
 
 const schema = z.object({
@@ -59,31 +60,46 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   });
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-[1.15fr_0.85fr]">
-      <section className="hidden border-r border-[var(--border)] p-12 lg:flex lg:flex-col lg:justify-between">
-        <Link href="/" className="text-lg font-black tracking-tight">
-          <span className="text-[var(--accent)]">●</span> AgentScope
+    <main className="relative grid min-h-screen bg-[var(--surface)] lg:grid-cols-2">
+      <div className="absolute right-5 top-5 z-10">
+        <ThemeToggle compact />
+      </div>
+      <section className="relative hidden overflow-hidden bg-[var(--hero)] p-12 text-[var(--hero-contrast)] lg:flex lg:flex-col lg:justify-between">
+        <span className="absolute -right-20 top-24 h-44 w-44 rounded-full bg-[var(--accent-secondary)] opacity-90" />
+        <span className="absolute bottom-28 right-28 h-12 w-12 rounded-lg border-8 border-white/20" />
+        <Link
+          href="/"
+          className="relative z-10 group flex items-center gap-2.5 text-lg font-black tracking-tight"
+        >
+          <span className="relative flex h-8 w-8 items-center justify-center rounded-md bg-white text-xs text-[var(--hero)] transition-transform duration-200 group-hover:-translate-y-0.5">
+            A
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--accent-secondary)]" />
+          </span>
+          AgentScope
         </Link>
-        <div className="max-w-2xl">
-          <p className="mb-5 font-mono text-xs uppercase tracking-[0.25em] text-[var(--accent)]">
-            Observe · Evaluate · Ship
+        <div className="relative z-10 max-w-xl">
+          <p className="mb-5 inline-flex rounded-full bg-white/12 px-3 py-1.5 text-xs font-semibold tracking-wide text-white">
+            Observe · Evaluate · Improve
           </p>
-          <h1 className="text-5xl font-semibold leading-[1.08] tracking-[-0.04em]">
+          <h1 className="text-5xl font-semibold leading-[1.06] tracking-[-0.045em]">
             Know why your agent failed before your users do.
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--muted)]">
+          <p className="mt-6 max-w-lg text-lg leading-8 text-white/70">
             Trace agent execution, compare versions, and turn AI quality into an
             engineering signal.
           </p>
         </div>
-        <p className="font-mono text-xs text-[#596070]">
-          AGENTSCOPE / CONTROL PLANE
+        <p className="relative z-10 text-sm text-white/60">
+          Built for teams shipping reliable agents.
         </p>
       </section>
-      <section className="flex items-center justify-center p-6">
-        <Card className="w-full max-w-md p-7 shadow-2xl shadow-black/20">
-          <div className="mb-8 lg:hidden">
-            <span className="text-[var(--accent)]">●</span>{" "}
+      <section className="flex items-center justify-center bg-[var(--surface)] p-6">
+        <Card className="w-full max-w-md border-0 p-7 sm:p-8">
+          <div className="mb-8 flex items-center gap-2 lg:hidden">
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)] text-xs text-[var(--accent-contrast)]">
+              A
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--accent-secondary)]" />
+            </span>
             <strong>AgentScope</strong>
           </div>
           <h2 className="text-2xl font-semibold tracking-tight">
@@ -131,17 +147,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             {serverError && (
               <p
                 role="alert"
-                className="rounded-md border border-red-900/60 bg-red-950/40 p-3 text-sm text-red-300"
+                className="rounded-lg border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-3 text-sm text-[var(--danger)]"
               >
                 {serverError}
               </p>
             )}
-            <Button className="w-full" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Working…"
-                : mode === "register"
-                  ? "Create account"
-                  : "Sign in"}
+            <Button
+              className="w-full"
+              disabled={isSubmitting}
+              loading={isSubmitting}
+            >
+              {mode === "register" ? "Create account" : "Sign in"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-[var(--muted)]">

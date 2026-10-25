@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import jwt
+import pytest
 
 from agentscope_api.core.config import Settings
 from agentscope_api.core.security import (
@@ -46,3 +47,27 @@ def test_api_key_format_and_hash() -> None:
     digest = keyed_hash(raw, "x" * 32)
     assert len(digest) == 64
     assert raw not in digest
+
+
+def test_production_configuration_fails_closed() -> None:
+    insecure = Settings(environment="production")
+    with pytest.raises(ValueError, match="JWT_SECRET"):
+        insecure.validate_for_startup()
+
+    secure = Settings(
+        environment="production",
+        jwt_secret="production-jwt-secret-that-is-long-and-random",  # noqa: S106
+        token_hash_secret="production-hash-secret-that-is-long-and-random",  # noqa: S106
+        worker_api_key="production-worker-secret-that-is-long-and-random",
+        refresh_cookie_secure=True,
+        database_url="postgresql+asyncpg://service:secret@db.internal/agentscope",
+        redis_url="rediss://cache.internal:6379/0",
+        allowed_origins=["https://agentscope.example.com"],
+        qdrant_url="https://cluster.example.qdrant.io",
+        qdrant_api_key="test-qdrant-key",
+    )
+    secure.validate_for_startup()
+
+    secure.allowed_origins = ["*"]
+    with pytest.raises(ValueError, match="CORS"):
+        secure.validate_for_startup()

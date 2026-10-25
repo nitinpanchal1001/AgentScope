@@ -1,6 +1,6 @@
 # AgentScope
 
-AgentScope is an open-source engineering platform for tracing, evaluating, experimenting with, and regression-testing AI agents. The repository currently contains the **Phase 2 tracing platform**: the secure control plane from Phase 1 plus end-to-end Python telemetry, ingestion, storage, and trace inspection.
+AgentScope is an open-source engineering platform for tracing, evaluating, experimenting with, and regression-testing AI agents. The repository contains the complete production-hardening scope: secure multi-tenant control plane, telemetry and evaluation, experiments, release gates, immutable replay, failure intelligence, alerting, retention, runnable demo data, observability, CI, and AWS deployment configuration.
 
 ## What works today
 
@@ -20,7 +20,46 @@ AgentScope is an open-source engineering platform for tracing, evaluating, exper
   deterministic sampling, graceful shutdown, and pre-transport redaction processors
 - cursor-paginated trace explorer with environment/status/model/version/span/date filters
 - trace detail views with safe JSON rendering, nested span timelines, and live SSE updates
-- separate Celery queue topology, ready for later phase task implementations
+- versioned provider/model pricing with project-specific overrides and historical cost attribution
+- automatic span-to-trace token and cost roll-ups, including a safe historical backfill
+- tenant-scoped analytics for volume, success/errors, P50/P95/P99 latency, tokens, cost, models,
+  providers, tools, agents, and failure types
+- an environment/time-filtered analytics dashboard with operational charts
+- immutable evaluator versions and production bindings with deterministic sampling and filters
+- ten deterministic evaluators, semantic similarity behind an embedding-provider boundary, and
+  eight structured LLM-as-judge evaluator types with one strict repair attempt
+- isolated Celery evaluation workers with bounded retry/backoff and durable failure state
+- evaluation scores, reasons, and evidence in trace detail and aggregate quality in analytics
+- explicit per-evaluator external-field allowlists before trace content can reach an LLM judge
+- tenant-scoped golden datasets with immutable, sequential, content-hashed versions
+- atomic JSON, JSONL, and CSV imports with complete validation before commit
+- manual case authoring, version browsing, and paginated case inspection in the web UI
+- experiments pinned to exact dataset and evaluator versions, with one durable run per case
+- bounded-concurrency Celery execution against a strict HTTP agent contract
+- experiment traces, asynchronous evaluation, live progress, cancellation, and supported metric aggregation
+- outbound-agent safeguards: environment-referenced credentials, destination policy, response bounds, no redirects
+- one completed experiment baseline per dataset lineage with atomic baseline replacement
+- persisted candidate comparisons with absolute/percentage deltas and regression classification
+- structured hard-fail and warning quality-gate rules with immutable result snapshots
+- an installable `agentscope` CLI with YAML orchestration, JSON output, and stable CI exit codes
+- a GitHub Actions quality-gate example and complete baseline/gate management UI
+- replay executions linked explicitly to their unchanged original production traces
+- model, prompt, temperature, agent-version, and parameter overrides with environment-only secrets
+- replay-generated traces that reuse original evaluator versions and preserve evaluation history
+- side-by-side output, score, latency, cost, token, tool-sequence, and span-structure comparison
+- bounded canonical failure documents for technical, quality, and possible agent-loop failures
+- a provider-neutral deterministic embedding boundary with rebuildable Qdrant indexing
+- tenant-filtered semantic failure search with a PostgreSQL-scoped availability fallback
+- windowed production alerts with cooldown deduplication and delivery history
+- signed webhooks, SMTP email delivery, Celery beat scheduling, and hard telemetry retention
+- authenticated live trace updates over server-sent events
+- density-based clustering with noise support, representatives, and explicitly inferred summaries
+- bounded-label Prometheus request, latency, and ingestion metrics at `/metrics`
+- a direct-UUID tenant-isolation suite and a Playwright critical-path browser suite
+- a configurable k6 profile for 100 concurrent 50-event ingestion batches by default
+- a runnable customer-support V1/V2 demo with four tools and 12 checked-in golden cases
+- production-fail-closed configuration, CodeQL/Dependabot, container-build CI, and security review
+- Terraform for ECS/Fargate, encrypted RDS/ElastiCache, managed Qdrant credentials, ALB, and scaling
 
 ## Architecture
 
@@ -30,20 +69,19 @@ Browser / Next.js  ───── JWT ─────► FastAPI control plane
                                          ├── PostgreSQL
                                          └── Redis (readiness / Celery broker)
 
-Future Phase 2:
 Developer agent ─► Python SDK ─► ingestion API ─► PostgreSQL traces + spans
                                                      │
 Browser / Next.js ◄──── JWT query APIs + SSE ────────┘
 
-Future phases:                                  Celery workers
+                                                Celery workers
                                            ┌─────────┼─────────┐
                                            ▼         ▼         ▼
                                       evaluation   replay   analytics
                                            │
                                            ▼
-                                        LiteLLM
+                                     Provider APIs
 
-Failed / low-quality traces ─► embeddings ─► Qdrant (Phase 9)
+Failed / low-quality traces ─► embeddings ─► Qdrant
 ```
 
 The HTTP boundary follows **router → service → repository → database**. Tenant-owned lookups join through memberships; knowing a UUID is never sufficient authorization. PostgreSQL remains the source of truth. Qdrant is reserved for bounded failure vectors, and Redis is used only for coordination or caching with a clear purpose.
@@ -70,6 +108,15 @@ python examples/customer-support-agent/demo.py
 
 Open `http://localhost:3000/traces`, select the project, and inspect the emitted span hierarchy.
 
+Seed and run the complete V1/V2 experiment demonstration:
+
+```bash
+make seed
+```
+
+This creates real resources through the public API, starts both deterministic experiments, and
+prints their IDs. Open `http://localhost:3000/experiments` to watch measured results.
+
 For host-based development, use Python 3.12+ and Node 20.9+:
 
 ```bash
@@ -94,6 +141,35 @@ Product APIs are versioned under `/api/v1`:
 - `POST /v1/ingest/batch` (project API key, intentionally outside the dashboard namespace)
 - `GET /projects/{id}/traces`
 - `GET /traces/{id}` and `/traces/{id}/events`
+- `GET /projects/{id}/analytics`
+- `GET|POST /projects/{id}/model-pricing`
+- `GET|POST /projects/{id}/evaluators`
+- `POST /projects/{id}/evaluators/{evaluator_id}/versions`
+- `GET|POST|PATCH /projects/{id}/evaluation-bindings`
+- `GET|POST /projects/{id}/traces/{trace_id}/evaluations`
+- `GET|POST /projects/{id}/datasets`
+- `GET /projects/{id}/datasets/{dataset_id}`
+- `POST /projects/{id}/datasets/{dataset_id}/items`
+- `POST /projects/{id}/datasets/{dataset_id}/versions`
+- `POST /projects/{id}/datasets/{dataset_id}/versions/import`
+- `GET /projects/{id}/datasets/{dataset_id}/versions/{version}`
+- `GET|POST /projects/{id}/experiments`
+- `GET /projects/{id}/experiments/{experiment_id}` and `/runs`
+- `POST /projects/{id}/experiments/{experiment_id}/start` and `/cancel`
+- `POST /projects/{id}/experiments/{experiment_id}/baseline`
+- `GET /projects/{id}/baseline`
+- `GET /projects/{id}/experiments/{experiment_id}/comparison`
+- `GET|POST /projects/{id}/quality-gates`
+- `POST /projects/{id}/quality-gates/{gate_id}/evaluate`
+- `GET /projects/{id}/experiments/{experiment_id}/quality-gate-results`
+- `GET|POST /projects/{id}/traces/{trace_id}/replays`
+- `GET /projects/{id}/replays/{replay_id}` and `/comparison`
+- `POST /projects/{id}/traces/{trace_id}/failure-analysis`
+- `GET /projects/{id}/failures` and `POST /projects/{id}/failures/search`
+- `GET /projects/{id}/failure-clusters` and `POST /failure-clusters/rebuild`
+- `GET|POST /projects/{id}/alert-rules` and `PUT|DELETE /alert-rules/{rule_id}`
+- `GET /projects/{id}/alerts`
+- `PATCH /projects/{id}/retention`
 
 All errors use `{ "error": { "code", "message", "request_id", "details" } }`.
 
@@ -103,9 +179,10 @@ All errors use `{ "error": { "code", "message", "request_id", "details" } }`.
 make test-api
 make test
 make lint
+make e2e
 ```
 
-The API suite covers hashing, JWT validation, refresh rotation/reuse detection, RBAC, API-key storage, idempotent ingestion, trace hierarchy persistence, and cross-tenant direct-UUID denial. The SDK suite proves concurrent async context isolation, error retention under sampling, built-in redaction, and host-application survival when transport is unavailable. CI applies all Alembic migrations to PostgreSQL and checks for model drift. No load-performance claim is made.
+The API suite covers hashing, JWT validation, refresh rotation/reuse detection, RBAC, API-key storage, idempotent ingestion, trace hierarchy persistence, evaluator versioning, production scheduling, worker authentication/completion, dataset immutability/import atomicity, experiment concurrency/aggregation, baseline comparison, quality-gate outcomes, replay immutability/comparison, and cross-tenant direct-UUID denial. The evaluation package tests every deterministic evaluator, semantic scoring, and explicit LLM data disclosure. The CLI suite verifies configuration rules and its `0/1/2` process contract. The SDK suite proves concurrent async context isolation, error retention under sampling, built-in redaction, and host-application survival when transport is unavailable. CI applies all Alembic migrations to PostgreSQL and checks for model drift. The E2E suite covers registration, organization, project, key, trace, dataset, evaluator, experiment, baseline, comparison, and quality-gate flow. `make load-test` runs the documented k6 method; no load-performance result is claimed without its environment and raw output.
 
 ## Security model
 
@@ -115,25 +192,36 @@ The API suite covers hashing, JWT validation, refresh rotation/reuse detection, 
 - Production startup rejects default secrets and insecure refresh cookies.
 - Authorization is permission-based; repositories scope tenant resources through membership joins.
 - Logs and audit metadata never contain passwords, bearer tokens, or complete API keys.
+- Evaluation workers receive only a result ID through Redis and authenticate separately to fetch a
+  payload; LLM judges receive only evaluator-allowlisted fields.
 
-See [Security](docs/security.md) for trust boundaries and operational considerations.
+See [Security](docs/security.md) and the [security review](docs/security-review.md) for trust
+boundaries, verified controls, and residual operational risks.
 
 ## Deployment and scaling
 
-V1 targets Next.js + stateless FastAPI on ECS/Fargate, RDS PostgreSQL, ElastiCache Redis, and managed Qdrant. High-volume telemetry can later split from the control plane into stateless ingestion, Kafka, processors, ClickHouse, and S3 without moving identity/configuration out of PostgreSQL. See [Scaling strategy](docs/scaling.md).
+The checked-in [Terraform stack](infrastructure/terraform/README.md) deploys Next.js, stateless
+FastAPI, isolated workers, and singleton scheduling on ECS/Fargate with encrypted RDS PostgreSQL,
+ElastiCache Redis, managed-Qdrant secrets, HTTPS ALB routing, logs, and autoscaling. High-volume
+telemetry can split into Kafka, processors, ClickHouse, and S3 without moving identity/configuration
+out of PostgreSQL. See [Scaling strategy](docs/scaling.md) and [load testing](docs/load-testing.md).
 
 ## Known limitations
 
-- Evaluations, datasets, experiments, regression gates, replay, failure intelligence, alerts, and the CLI are later phases and are not implemented.
-- Phase 2 records caller-supplied token/cost values but does not yet provide Phase 3 pricing or aggregate analytics.
+- Semantic evaluation currently ships an OpenAI embedding provider; the interface is provider-neutral
+  and additional providers can be added without changing evaluator persistence.
 - Password-reset persistence exists, but token issuance/email delivery endpoints are deferred until a notification provider is selected.
 - Member invitation and role mutation APIs are deferred; the schema and permission model support them.
 - Readiness checks PostgreSQL and Redis. Qdrant becomes critical only when failure intelligence is enabled.
-- Exact reproducibility of provider-hosted LLM outputs cannot be guaranteed; later experiment storage will preserve all controllable configuration.
+- Provider-hosted LLM output cannot be exactly reproducible; experiments preserve all controllable
+  configuration and immutable input/evaluator versions.
 
-## Roadmap
+## Operations references
 
-The next implementation phase is metrics and cost analytics, followed by evaluation → datasets → experiments → regression/CLI → replay → failure intelligence → monitoring/alerts → hardening. Each phase must add migrations, tests, documentation, and a complete verified exit path before the next begins.
+- [Monitoring, alerts, and retention](docs/monitoring-alerts.md)
+- [Experiments and HTTP agent contract](docs/experiments.md)
+- [Quality gates and CI](docs/quality-gates.md)
+- [AWS deployment](infrastructure/terraform/README.md)
 
 ## Contributing
 

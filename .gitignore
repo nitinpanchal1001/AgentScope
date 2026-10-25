@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .venv/
+.venv-*/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -15,4 +16,7 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+.terraform/
+*.tfstate
+*.tfstate.*
 

@@ -1,6 +1,7 @@
 import asyncio
 import binascii
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
@@ -39,6 +40,9 @@ def _summary(trace: Trace, environment: str) -> TraceSummary:
         output_tokens=trace.output_tokens,
         total_tokens=trace.total_tokens,
         total_cost=Decimal(trace.total_cost),
+        evaluation_score=(
+            Decimal(trace.evaluation_score) if trace.evaluation_score is not None else None
+        ),
         agent_version=trace.agent_version,
         error_type=trace.error_type,
         created_at=trace.created_at,
@@ -50,6 +54,7 @@ def _span(span: Span) -> SpanResponse:
         id=span.id,
         external_span_id=span.external_span_id,
         trace_id=span.trace_id,
+        pricing_id=span.pricing_id,
         parent_span_id=span.parent_span_id,
         type=span.type,
         name=span.name,
@@ -156,7 +161,7 @@ async def stream_trace(
         raise NotFoundError("Trace")
     trace, environment = result
 
-    async def events():  # type: ignore[no-untyped-def]
+    async def events() -> AsyncIterator[str]:
         previous = ""
         for _ in range(300):
             if await request.is_disconnected():

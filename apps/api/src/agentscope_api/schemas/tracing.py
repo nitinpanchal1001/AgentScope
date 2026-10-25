@@ -75,6 +75,7 @@ class SpanResponse(BaseModel):
     id: UUID
     external_span_id: str
     trace_id: UUID
+    pricing_id: UUID | None
     parent_span_id: UUID | None
     type: SpanType
     name: str
@@ -111,6 +112,7 @@ class TraceSummary(BaseModel):
     output_tokens: int
     total_tokens: int
     total_cost: Decimal
+    evaluation_score: Decimal | None
     agent_version: str | None
     error_type: FailureType | None
     created_at: datetime

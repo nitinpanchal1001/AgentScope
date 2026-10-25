@@ -1,0 +1,2 @@
+{"input":{"brief":"Design a multi-tenant experiment execution API","requirements":["Idempotent start","Cancellation","Progress","Concurrency limits","Audit trail"]},"expected_output":{"criteria":["API contract","Tenant isolation","Persistence model","Failure handling"]},"expected_tools":[]}
+{"input":{"brief":"Design ingestion for high-volume agent traces","requirements":["At-least-once delivery","Deduplication","Batching","Backpressure"]},"expected_output":{"criteria":["Explicit invariants","Scalability approach","Observability","Recovery strategy"]},"expected_tools":[]}

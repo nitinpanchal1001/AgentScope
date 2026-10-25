@@ -11,7 +11,7 @@ from agentscope_api.core.security import generate_api_key, keyed_hash
 from agentscope_api.core.slugs import append_slug_suffix, slugify
 from agentscope_api.models import ApiKey, Environment, Membership, Project, User
 from agentscope_api.repositories.projects import ProjectRepository
-from agentscope_api.schemas.projects import ApiKeyCreate, ProjectCreate
+from agentscope_api.schemas.projects import ApiKeyCreate, ProjectCreate, ProjectRetentionUpdate
 from agentscope_api.services.audit import record_audit
 from agentscope_api.services.authorization import Permission, require_permission
 
@@ -104,6 +104,27 @@ class ProjectService:
             await self.session.rollback()
             raise
         return api_key, raw_key
+
+    async def update_retention(
+        self,
+        project: Project,
+        membership: Membership,
+        request: ProjectRetentionUpdate,
+        user: User,
+    ) -> Project:
+        require_permission(membership.role, Permission.PROJECT_MANAGE)
+        project.retention_days = request.retention_days
+        record_audit(
+            self.session,
+            organization_id=project.organization_id,
+            actor_id=user.id,
+            action="project.retention_updated",
+            resource_type="project",
+            resource_id=project.id,
+            metadata={"retention_days": request.retention_days},
+        )
+        await self.session.commit()
+        return project
 
     async def revoke_api_key(
         self, project: Project, membership: Membership, api_key_id: UUID, user: User

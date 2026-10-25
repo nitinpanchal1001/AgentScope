@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,8 +10,11 @@ from agentscope_api.api.dependencies import IngestionAccess
 from agentscope_api.core.config import Settings
 from agentscope_api.core.exceptions import IngestionError, PayloadTooLargeError
 from agentscope_api.models import Span, TelemetryEventType, Trace, TraceStatus
+from agentscope_api.repositories.pricing import PricingRepository
 from agentscope_api.repositories.tracing import TracingRepository
 from agentscope_api.schemas.tracing import IngestionBatch, IngestionResponse, TelemetryEvent
+from agentscope_api.services.evaluations import EvaluationService
+from agentscope_api.services.pricing import calculate_cost, normalize_pricing_key
 
 
 def _bounded_json(value: Any, max_bytes: int) -> Any:
@@ -39,6 +42,8 @@ class IngestionService:
         self.session = session
         self.settings = settings
         self.repository = TracingRepository(session)
+        self.pending_evaluation_dispatches: list[UUID] = []
+        self.pending_failure_dispatches: list[UUID] = []
 
     async def ingest(
         self, batch: IngestionBatch, access: IngestionAccess, raw_size: int
@@ -148,11 +153,26 @@ class IngestionService:
         trace.total_cost = payload.cost if payload.cost is not None else trace.total_cost
         trace.error_type = payload.error_type
         trace.error_message = payload.error_message
+        await self.session.flush()
+        usage = await self.repository.aggregate_span_usage(trace.id)
+        if usage["usage_span_count"]:
+            if payload.input_tokens is None:
+                trace.input_tokens = int(usage["input_tokens"])
+            if payload.output_tokens is None:
+                trace.output_tokens = int(usage["output_tokens"])
+            if payload.total_tokens is None:
+                trace.total_tokens = int(usage["total_tokens"])
+            if payload.cost is None:
+                trace.total_cost = Decimal(str(usage["total_cost"]))
         if payload.metadata:
             trace.trace_metadata = _bounded_json(
                 {**trace.trace_metadata, **payload.metadata},
                 self.settings.ingest_max_metadata_bytes,
             )
+        self.pending_evaluation_dispatches.extend(
+            await EvaluationService(self.session).prepare_production(trace)
+        )
+        self.pending_failure_dispatches.append(trace.id)
 
     async def _span_start(self, event: TelemetryEvent, access: IngestionAccess) -> None:
         span_type = event.payload.span_type
@@ -233,7 +253,24 @@ class IngestionService:
             if payload.total_tokens is not None
             else span.input_tokens + span.output_tokens
         )
-        span.cost = payload.cost if payload.cost is not None else span.cost
+        if payload.cost is not None:
+            span.cost = payload.cost
+        elif span.provider and span.model:
+            provider, model = normalize_pricing_key(span.provider, span.model)
+            pricing = await PricingRepository(self.session).find_effective(
+                project_id=access.project.id,
+                provider=provider,
+                model=model,
+                at=span.started_at,
+            )
+            if pricing is not None:
+                span.pricing_id = pricing.id
+                span.cost = calculate_cost(
+                    input_tokens=span.input_tokens,
+                    output_tokens=span.output_tokens,
+                    input_price_per_million_tokens=pricing.input_price_per_million_tokens,
+                    output_price_per_million_tokens=pricing.output_price_per_million_tokens,
+                )
         span.error_type = payload.error_type
         span.error_message = payload.error_message
         if payload.metadata:

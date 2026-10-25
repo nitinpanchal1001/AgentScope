@@ -2,23 +2,21 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Activity,
-  Boxes,
-  ChevronRight,
-  KeyRound,
-  LogOut,
-  Plus,
-  ShieldCheck,
-} from "lucide-react";
+import { Boxes, ChevronRight, KeyRound, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { apiFetch, refreshSession } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { Button, Card, FieldError, Input, Label } from "@/components/ui";
+import {
+  Button,
+  Card,
+  FieldError,
+  Input,
+  Label,
+  PageLoader,
+} from "@/components/ui";
 
 type Organization = { id: string; name: string; slug: string; role: string };
 type Project = {
@@ -146,7 +144,7 @@ function WorkspaceForms({
   if (!selectedOrg)
     return (
       <Card className="mx-auto mt-20 max-w-xl p-8">
-        <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-400/10 text-[var(--accent)]">
+        <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
           <Boxes size={21} />
         </div>
         <h2 className="text-xl font-semibold">
@@ -170,7 +168,11 @@ function WorkspaceForms({
               {createOrg.error.message}
             </p>
           )}
-          <Button className="w-full" disabled={createOrg.isPending}>
+          <Button
+            className="w-full"
+            disabled={createOrg.isPending}
+            loading={createOrg.isPending}
+          >
             Create organization
           </Button>
         </form>
@@ -181,19 +183,12 @@ function WorkspaceForms({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--accent)]">
+          <p className="text-sm font-medium text-[var(--muted)]">
             Foundation / Workspace
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {selectedOrg.name}
           </h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Tenant role: {selectedOrg.role}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)]">
-          <ShieldCheck size={15} className="text-[var(--accent)]" /> Tenant
-          isolation active
         </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
@@ -212,7 +207,7 @@ function WorkspaceForms({
               <button
                 key={project.id}
                 onClick={() => onSelectProject(project.id)}
-                className={`flex w-full items-center justify-between rounded-lg border p-3 text-left ${project.id === selectedProject?.id ? "border-emerald-400/50 bg-emerald-400/5" : "border-[var(--border)] hover:bg-white/[0.03]"}`}
+                className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors ${project.id === selectedProject?.id ? "border-[var(--accent-border)] bg-[var(--accent-soft)]" : "border-[var(--border)] hover:bg-[var(--hover)]"}`}
               >
                 <span>
                   <span className="block text-sm font-semibold">
@@ -223,7 +218,7 @@ function WorkspaceForms({
               </button>
             ))}
             {!projects.isLoading && !projects.data?.length && (
-              <p className="rounded-lg border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">
+              <p className="rounded-md border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">
                 No projects yet.
               </p>
             )}
@@ -235,7 +230,7 @@ function WorkspaceForms({
                 createProject.mutate(v),
               )}
             >
-              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <p className="text-xs font-medium text-[var(--muted)]">
                 New project
               </p>
               <Input
@@ -249,6 +244,7 @@ function WorkspaceForms({
                 className="w-full"
                 variant="outline"
                 disabled={createProject.isPending}
+                loading={createProject.isPending}
               >
                 Create project
               </Button>
@@ -279,11 +275,11 @@ function WorkspaceForms({
                 ))}
               </div>
               {revealedKey && (
-                <div className="mb-5 rounded-lg border border-amber-500/30 bg-amber-400/[0.06] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">
+                <div className="mb-5 rounded-xl border border-[var(--warning)]/30 bg-[var(--warning-soft)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--warning)]">
                     Copy now — shown once
                   </p>
-                  <code className="mt-2 block overflow-x-auto text-sm text-amber-100">
+                  <code className="mt-2 block overflow-x-auto text-sm text-[var(--foreground)]">
                     {revealedKey}
                   </code>
                   <Button
@@ -310,7 +306,7 @@ function WorkspaceForms({
                   <div>
                     <Label>Environment</Label>
                     <select
-                      className="h-10 w-full rounded-md border border-[var(--border)] bg-[#0c0f15] px-3 text-sm"
+                      className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                       {...keyForm.register("environment_id")}
                     >
                       {environments.data?.map((env) => (
@@ -320,7 +316,11 @@ function WorkspaceForms({
                       ))}
                     </select>
                   </div>
-                  <Button className="self-end" disabled={createKey.isPending}>
+                  <Button
+                    className="self-end"
+                    disabled={createKey.isPending}
+                    loading={createKey.isPending}
+                  >
                     <KeyRound size={15} className="mr-2" />
                     Issue key
                   </Button>
@@ -362,7 +362,6 @@ function WorkspaceForms({
 export default function DashboardPage() {
   const router = useRouter();
   const token = useAuthStore((state) => state.accessToken);
-  const user = useAuthStore((state) => state.user);
   const clear = useAuthStore((state) => state.clear);
   const [bootstrapped, setBootstrapped] = useState(Boolean(token));
   const [selectedOrgId, setSelectedOrgId] = useState<string>();
@@ -394,35 +393,16 @@ export default function DashboardPage() {
     projectList.data?.find((project) => project.id === selectedProjectId) ??
     projectList.data?.[0];
 
-  const logout = async () => {
-    await apiFetch("/api/v1/auth/logout", { method: "POST" }).catch(
-      () => undefined,
-    );
-    clear();
-    router.replace("/login");
-  };
   if (!bootstrapped || organizations.isLoading)
-    return (
-      <div className="flex min-h-screen items-center justify-center font-mono text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-        Loading control plane…
-      </div>
-    );
+    return <PageLoader label="Loading workspace" />;
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[250px_1fr]">
-      <aside className="border-b border-[var(--border)] bg-[#0b0e14] p-5 lg:min-h-screen lg:border-b-0 lg:border-r">
-        <div className="flex items-center justify-between lg:block">
-          <div className="text-lg font-black">
-            <span className="text-[var(--accent)]">●</span> AgentScope
-          </div>
-          <Button className="lg:hidden" variant="ghost" onClick={logout}>
-            <LogOut size={16} />
-          </Button>
-        </div>
-        {organizations.data && organizations.data.length > 0 && (
+    <main className="min-h-screen p-5 sm:p-8 lg:p-10">
+      <div className="mx-auto max-w-6xl space-y-6">
+        {organizations.data && organizations.data.length > 1 && (
           <select
             aria-label="Organization"
-            className="mt-5 h-10 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
+            className="h-10 w-full max-w-sm rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
             value={activeOrgId}
             onChange={(event) => {
               setSelectedOrgId(event.target.value);
@@ -436,38 +416,12 @@ export default function DashboardPage() {
             ))}
           </select>
         )}
-        <nav className="mt-8 hidden space-y-1 lg:block">
-          <div className="flex items-center gap-3 rounded-md bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-[var(--accent)]">
-            <Activity size={16} /> Foundation
-          </div>
-          <Link
-            href="/traces"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-[var(--muted)] hover:bg-white/5 hover:text-white"
-          >
-            <Boxes size={16} /> Traces
-          </Link>
-        </nav>
-        <div className="mt-8 hidden border-t border-[var(--border)] pt-5 lg:block">
-          <p className="truncate text-sm font-medium">{user?.display_name}</p>
-          <p className="truncate text-xs text-[var(--muted)]">{user?.email}</p>
-          <Button
-            variant="ghost"
-            className="mt-3 w-full justify-start px-2"
-            onClick={logout}
-          >
-            <LogOut size={15} className="mr-2" /> Sign out
-          </Button>
-        </div>
-      </aside>
-      <main className="p-5 sm:p-8 lg:p-10">
-        <div className="mx-auto max-w-6xl">
-          <WorkspaceForms
-            selectedOrg={selectedOrg}
-            selectedProject={selectedProject}
-            onSelectProject={setSelectedProjectId}
-          />
-        </div>
-      </main>
-    </div>
+        <WorkspaceForms
+          selectedOrg={selectedOrg}
+          selectedProject={selectedProject}
+          onSelectProject={setSelectedProjectId}
+        />
+      </div>
+    </main>
   );
 }

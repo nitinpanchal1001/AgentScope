@@ -1,17 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-} from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button, Card, Input, Label, PageLoader } from "@/components/ui";
 import { apiFetch, refreshSession } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 
@@ -30,6 +24,7 @@ type Trace = {
   latency_ms: number | null;
   total_tokens: number;
   total_cost: string;
+  evaluation_score: string | null;
   agent_version: string | null;
   error_type: string | null;
 };
@@ -37,10 +32,11 @@ type TracePage = { items: Trace[]; next_cursor: string | null };
 
 function statusClass(status: string) {
   if (status === "SUCCESS")
-    return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
-  if (status === "ERROR") return "border-red-400/30 bg-red-400/10 text-red-300";
+    return "border-[var(--success)]/30 bg-[var(--success-soft)] text-[var(--success)]";
+  if (status === "ERROR")
+    return "border-[var(--danger)]/30 bg-[var(--danger-soft)] text-[var(--danger)]";
   if (status === "RUNNING")
-    return "border-sky-400/30 bg-sky-400/10 text-sky-300";
+    return "border-[var(--info)]/30 bg-[var(--accent-soft)] text-[var(--info)]";
   return "border-[var(--border)] text-[var(--muted)]";
 }
 
@@ -139,11 +135,7 @@ export default function TracesPage() {
   };
 
   if (!ready || organizations.isLoading)
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-[var(--muted)]">
-        Loading traces…
-      </div>
-    );
+    return <PageLoader label="Loading traces" />;
 
   return (
     <main className="min-h-screen p-5 sm:p-8">
@@ -152,18 +144,14 @@ export default function TracesPage() {
           <div>
             <Link
               href="/dashboard"
-              className="mb-3 flex items-center gap-2 text-sm text-[var(--muted)] hover:text-white"
+              className="mb-3 flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)]"
             >
               <ArrowLeft size={15} /> Workspace
             </Link>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--accent)]">
+            <p className="text-sm font-medium text-[var(--muted)]">
               Tracing / Explorer
             </p>
             <h1 className="mt-2 text-3xl font-semibold">Agent traces</h1>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
-            <Activity size={15} className="text-[var(--accent)]" /> Refreshes
-            every 5 seconds
           </div>
         </div>
 
@@ -171,7 +159,7 @@ export default function TracesPage() {
           <div>
             <Label>Organization</Label>
             <select
-              className="h-10 w-full rounded-md border border-[var(--border)] bg-[#0c0f15] px-3 text-sm"
+              className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
               value={activeOrganizationId}
               onChange={(event) => {
                 setOrganizationId(event.target.value);
@@ -189,7 +177,7 @@ export default function TracesPage() {
           <div>
             <Label>Project</Label>
             <select
-              className="h-10 w-full rounded-md border border-[var(--border)] bg-[#0c0f15] px-3 text-sm"
+              className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
               value={activeProjectId}
               onChange={(event) => {
                 setProjectId(event.target.value);
@@ -207,7 +195,7 @@ export default function TracesPage() {
           <div>
             <Label>Environment</Label>
             <select
-              className="h-10 w-full rounded-md border border-[var(--border)] bg-[#0c0f15] px-3 text-sm"
+              className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
               value={environmentId}
               onChange={(event) => {
                 setEnvironmentId(event.target.value);
@@ -225,7 +213,7 @@ export default function TracesPage() {
           <div>
             <Label>Status</Label>
             <select
-              className="h-10 w-full rounded-md border border-[var(--border)] bg-[#0c0f15] px-3 text-sm"
+              className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value);
@@ -263,7 +251,7 @@ export default function TracesPage() {
           <div>
             <Label>Span type</Label>
             <select
-              className="h-10 w-full rounded-md border border-[var(--border)] bg-[#0c0f15] px-3 text-sm"
+              className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
               value={spanType}
               onChange={(event) => {
                 setSpanType(event.target.value);
@@ -352,7 +340,10 @@ export default function TracesPage() {
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {traces.data?.items.map((trace) => (
-                  <tr key={trace.id} className="hover:bg-white/[0.025]">
+                  <tr
+                    key={trace.id}
+                    className="transition-colors hover:bg-[var(--hover)]"
+                  >
                     <td className="px-5 py-4">
                       <Link
                         href={`/traces/${trace.id}`}
@@ -377,7 +368,11 @@ export default function TracesPage() {
                         {trace.status}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-[var(--muted)]">—</td>
+                    <td className="px-5 py-4 text-[var(--muted)]">
+                      {trace.evaluation_score == null
+                        ? "—"
+                        : `${(Number(trace.evaluation_score) * 100).toFixed(0)}%`}
+                    </td>
                     <td className="px-5 py-4">
                       {trace.latency_ms == null
                         ? "—"

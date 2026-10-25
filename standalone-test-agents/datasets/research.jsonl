@@ -1,0 +1,3 @@
+{"input":{"question":"What are the latest official recommendations for evaluating AI agents?"},"expected_tools":["openai_web_search"],"metadata":{"case":"current-guidance"}}
+{"input":{"question":"Compare current PostgreSQL and Redis roles in a production AI observability stack."},"expected_tools":["openai_web_search"],"metadata":{"case":"technology-comparison"}}
+{"input":{"question":"Find two primary sources about prompt injection defenses and summarize where they agree."},"expected_tools":["openai_web_search"],"metadata":{"case":"source-synthesis"}}

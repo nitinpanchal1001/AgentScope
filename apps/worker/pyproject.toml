@@ -1,11 +1,28 @@
 [project]
 name = "agentscope-worker"
-version = "0.1.0"
+version = "0.11.0"
 requires-python = ">=3.12"
 dependencies = [
+  "agentscope-evaluation",
   "celery[redis]>=5.4,<6",
+  "httpx>=0.28,<1",
   "pydantic-settings>=2.7,<3",
   "python-json-logger>=3.2,<4",
+]
+
+[tool.uv.sources]
+agentscope-evaluation = { path = "../../packages/evaluation", editable = true }
+
+[tool.uv]
+# Keep the evaluation runtime on the security-fixed filelock release while
+# LiteLLM's package metadata still carries its conservative <4 upper bound.
+override-dependencies = ["filelock>=4.2.1,<5"]
+
+[dependency-groups]
+dev = [
+  "mypy>=1.14,<2",
+  "pytest>=9.0.3,<10",
+  "ruff>=0.9,<1",
 ]
 
 [build-system]
@@ -14,4 +31,19 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentscope_worker"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S"]
+ignore = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
 

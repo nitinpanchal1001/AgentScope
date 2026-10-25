@@ -1,0 +1,3 @@
+{"input":{"question":"How long does standard shipping take?"},"expected_tools":["search_knowledge_base"],"metadata":{"case":"shipping","expected_fact":"3–5 business days"}}
+{"input":{"question":"Can I return an unused product after 20 days?"},"expected_tools":["search_knowledge_base"],"metadata":{"case":"returns","expected_fact":"within 30 days"}}
+{"input":{"question":"Do you provide lifetime accidental-damage coverage?"},"expected_tools":["search_knowledge_base"],"metadata":{"case":"unknown-policy","must_abstain":true}}

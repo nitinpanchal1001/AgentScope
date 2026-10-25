@@ -1,0 +1,25 @@
+name: AgentScope quality gate example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  agent-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12" }
+      - name: Install AgentScope CLI
+        run: uv tool install ./packages/cli
+      - name: Run candidate experiment and quality gate
+        env:
+          AGENTSCOPE_TOKEN: ${{ secrets.AGENTSCOPE_TOKEN }}
+          CANDIDATE_AGENT_AUTHORIZATION: ${{ secrets.CANDIDATE_AGENT_AUTHORIZATION }}
+        run: agentscope eval run --config agentscope.yaml --json | tee agentscope-result.json
+      - name: Upload machine-readable result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentscope-result
+          path: agentscope-result.json

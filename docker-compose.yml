@@ -36,6 +36,18 @@ services:
       timeout: 3s
       retries: 10
 
+  demo-agent:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/demo-agent.Dockerfile
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: .
@@ -48,6 +60,8 @@ services:
       AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
       AGENTSCOPE_JWT_SECRET: ${AGENTSCOPE_JWT_SECRET:-local-compose-jwt-secret-change-before-sharing}
       AGENTSCOPE_TOKEN_HASH_SECRET: ${AGENTSCOPE_TOKEN_HASH_SECRET:-local-compose-hash-secret-change-before-sharing}
+      AGENTSCOPE_WORKER_API_KEY: ${AGENTSCOPE_WORKER_API_KEY:-local-compose-worker-key-change-before-sharing}
+      AGENTSCOPE_QDRANT_URL: ${AGENTSCOPE_QDRANT_URL:-http://qdrant:6333}
     ports:
       - "8000:8000"
     depends_on:
@@ -70,10 +84,19 @@ services:
         required: false
     environment:
       AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+      AGENTSCOPE_WORKER_API_URL: http://api:8000
+      AGENTSCOPE_WORKER_API_KEY: ${AGENTSCOPE_WORKER_API_KEY:-local-compose-worker-key-change-before-sharing}
     command: celery -A agentscope_worker.celery_app worker -Q evaluation -l INFO
     depends_on:
       redis:
         condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A agentscope_worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
 
   worker-experiment:
     build:
@@ -84,10 +107,21 @@ services:
         required: false
     environment:
       AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+      AGENTSCOPE_WORKER_API_URL: http://api:8000
+      AGENTSCOPE_WORKER_API_KEY: ${AGENTSCOPE_WORKER_API_KEY:-local-compose-worker-key-change-before-sharing}
+      AGENTSCOPE_EXPERIMENT_ALLOW_HTTP: ${AGENTSCOPE_EXPERIMENT_ALLOW_HTTP:-true}
+      AGENTSCOPE_EXPERIMENT_ALLOW_PRIVATE_ENDPOINTS: ${AGENTSCOPE_EXPERIMENT_ALLOW_PRIVATE_ENDPOINTS:-true}
     command: celery -A agentscope_worker.celery_app worker -Q experiment,replay -l INFO
     depends_on:
       redis:
         condition: service_healthy
+      demo-agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A agentscope_worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
 
   worker-general:
     build:
@@ -98,9 +132,46 @@ services:
         required: false
     environment:
       AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+      AGENTSCOPE_WORKER_API_URL: http://api:8000
+      AGENTSCOPE_WORKER_API_KEY: ${AGENTSCOPE_WORKER_API_KEY:-local-compose-worker-key-change-before-sharing}
+      AGENTSCOPE_NOTIFICATION_SIGNING_SECRET: ${AGENTSCOPE_NOTIFICATION_SIGNING_SECRET:-local-compose-notification-secret-change-before-sharing}
+      AGENTSCOPE_NOTIFICATION_ALLOW_HTTP: ${AGENTSCOPE_NOTIFICATION_ALLOW_HTTP:-true}
+      AGENTSCOPE_NOTIFICATION_ALLOW_PRIVATE_ENDPOINTS: ${AGENTSCOPE_NOTIFICATION_ALLOW_PRIVATE_ENDPOINTS:-true}
+      AGENTSCOPE_SMTP_HOST: ${AGENTSCOPE_SMTP_HOST:-}
+      AGENTSCOPE_SMTP_PORT: ${AGENTSCOPE_SMTP_PORT:-587}
+      AGENTSCOPE_SMTP_USERNAME: ${AGENTSCOPE_SMTP_USERNAME:-}
+      AGENTSCOPE_SMTP_PASSWORD: ${AGENTSCOPE_SMTP_PASSWORD:-}
+      AGENTSCOPE_SMTP_USE_TLS: ${AGENTSCOPE_SMTP_USE_TLS:-true}
+      AGENTSCOPE_SMTP_FROM: ${AGENTSCOPE_SMTP_FROM:-alerts@agentscope.local}
     command: celery -A agentscope_worker.celery_app worker -Q failure_analysis,analytics,alerts,maintenance -l INFO
     depends_on:
       redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A agentscope_worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+  worker-beat:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENTSCOPE_REDIS_URL: ${AGENTSCOPE_REDIS_URL:-redis://redis:6379/0}
+      AGENTSCOPE_WORKER_API_URL: http://api:8000
+      AGENTSCOPE_WORKER_API_KEY: ${AGENTSCOPE_WORKER_API_KEY:-local-compose-worker-key-change-before-sharing}
+      AGENTSCOPE_NOTIFICATION_SIGNING_SECRET: ${AGENTSCOPE_NOTIFICATION_SIGNING_SECRET:-local-compose-notification-secret-change-before-sharing}
+    command: celery -A agentscope_worker.celery_app beat -l INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
         condition: service_healthy
 
   web:

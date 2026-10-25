@@ -28,7 +28,9 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const token = useAuthStore.getState().accessToken;
   const headers = new Headers(init.headers);
-  if (init.body) headers.set("Content-Type", "application/json");
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isFormData) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${API_URL}${path}`, {
     ...init,

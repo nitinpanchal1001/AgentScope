@@ -23,6 +23,10 @@ class ProjectResponse(BaseModel):
     created_at: datetime
 
 
+class ProjectRetentionUpdate(BaseModel):
+    retention_days: int = Field(ge=1, le=365)
+
+
 class EnvironmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

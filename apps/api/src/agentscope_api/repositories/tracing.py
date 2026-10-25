@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import String, and_, exists, or_, select
+from sqlalchemy import String, and_, exists, func, or_, select
 from sqlalchemy import cast as sql_cast
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -146,3 +146,26 @@ class TracingRepository:
             .execution_options(populate_existing=True)
         )
         return list(rows)
+
+    async def aggregate_span_usage(self, trace_id: UUID) -> dict[str, int | Any]:
+        row = (
+            await self.session.execute(
+                select(
+                    func.sum(Span.input_tokens),
+                    func.sum(Span.output_tokens),
+                    func.sum(Span.total_tokens),
+                    func.sum(Span.cost),
+                    func.count(Span.id),
+                ).where(
+                    Span.trace_id == trace_id,
+                    or_(Span.total_tokens > 0, Span.cost > 0),
+                )
+            )
+        ).one()
+        return {
+            "input_tokens": int(row[0] or 0),
+            "output_tokens": int(row[1] or 0),
+            "total_tokens": int(row[2] or 0),
+            "total_cost": row[3] or 0,
+            "usage_span_count": int(row[4] or 0),
+        }

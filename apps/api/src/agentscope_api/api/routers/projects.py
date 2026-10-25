@@ -17,6 +17,7 @@ from agentscope_api.schemas.projects import (
     EnvironmentResponse,
     ProjectCreate,
     ProjectResponse,
+    ProjectRetentionUpdate,
 )
 from agentscope_api.services.authorization import Permission, require_permission
 from agentscope_api.services.projects import ProjectService
@@ -58,6 +59,20 @@ async def list_projects(
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: UUID, access: ProjectAccessDependency) -> ProjectResponse:
     return ProjectResponse.model_validate(access.project)
+
+
+@router.patch("/projects/{project_id}/retention", response_model=ProjectResponse)
+async def update_project_retention(
+    payload: ProjectRetentionUpdate,
+    access: ProjectAccessDependency,
+    session: SessionDependency,
+    settings: SettingsDependency,
+    user: CurrentUser,
+) -> ProjectResponse:
+    project = await ProjectService(session, settings).update_retention(
+        access.project, access.membership, payload, user
+    )
+    return ProjectResponse.model_validate(project)
 
 
 @router.get("/projects/{project_id}/environments", response_model=list[EnvironmentResponse])

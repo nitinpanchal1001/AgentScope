@@ -1,0 +1,50 @@
+[project]
+name = "agentscope-evaluation"
+version = "0.4.0"
+description = "Versioned evaluation engine for AgentScope"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28,<1",
+  "jsonschema>=4.23,<5",
+  "litellm>=1.80,<2",
+  "pydantic>=2.10,<3",
+]
+
+[dependency-groups]
+dev = [
+  "mypy>=1.14,<2",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=0.25,<2",
+  "ruff>=0.9,<1",
+  "types-jsonschema>=4.23,<5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentscope_evaluation"]
+
+[tool.uv]
+# LiteLLM currently caps filelock below 4, but that range is affected by
+# CVE-2026-112907/112913/112940. The public FileLock API used by LiteLLM is
+# compatible with 4.x and is covered by the provider import test.
+override-dependencies = ["filelock>=4.2.1,<5"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S"]
+ignore = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+

@@ -1,0 +1,47 @@
+api_url: https://agentscope.example.com
+token_env: AGENTSCOPE_TOKEN
+organization: acme-ai
+project: customer-support
+dataset: golden-v3
+dataset_version: latest
+environment: development
+
+evaluators:
+  - Correctness
+  - Hallucination
+  - Tool accuracy
+
+agent:
+  type: http
+  endpoint: https://candidate-agent.example.com/invoke
+  timeout_seconds: 60
+  headers_from_env:
+    Authorization: CANDIDATE_AGENT_AUTHORIZATION
+  provider: openai
+  model: gpt-5
+  prompt_version: support-v3
+
+experiment:
+  name: CI candidate
+  max_concurrency: 5
+  poll_interval_seconds: 2
+  timeout_seconds: 1800
+
+quality_gate:
+  name: Production release
+  correctness:
+    max_regression: 0.03
+    comparison: absolute
+    severity: FAIL
+  hallucination:
+    max_increase: 0.02
+    comparison: absolute
+    severity: FAIL
+  latency_p95:
+    max_increase: 0.25
+    comparison: relative
+    severity: WARN
+  cost:
+    max_increase: 0.15
+    comparison: relative
+    severity: WARN
