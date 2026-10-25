@@ -36,7 +36,7 @@ jobs:
       AGENTSCOPE_TOKEN_HASH_SECRET: ci-only-hash-secret-with-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-groups --frozen
       - run: uv run ruff check .
@@ -69,7 +69,7 @@ jobs:
         working-directory: packages/python-sdk
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-groups --frozen
       - run: uv run ruff check .
@@ -84,7 +84,7 @@ jobs:
         working-directory: packages/evaluation
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-groups --frozen
       - run: uv run ruff check .
@@ -99,7 +99,7 @@ jobs:
         working-directory: packages/cli
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-groups --frozen
       - run: uv run ruff check .
@@ -114,7 +114,7 @@ jobs:
         working-directory: apps/worker
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-groups --frozen
       - run: uv run ruff check .
@@ -135,7 +135,7 @@ jobs:
           - packages/cli
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-groups --frozen
         working-directory: ${{ matrix.component }}
