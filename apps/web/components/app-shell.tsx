@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { ThemeToggle } from "@/components/theme-provider";
 import { PageTransition } from "@/components/page-transition";
 import { Button } from "@/components/ui";
@@ -41,6 +41,13 @@ const navigation = [
 
 const publicRoutes = new Set(["/", "/login", "/register"]);
 
+function isNavigationItemActive(pathname: string, href: string) {
+  return href === "/dashboard"
+    ? pathname === href
+    : pathname.startsWith(href) ||
+        (href === "/monitoring" && pathname.startsWith("/analytics"));
+}
+
 function Brand() {
   return (
     <Link
@@ -62,6 +69,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const clear = useAuthStore((state) => state.clear);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const activeNavigationIndex = Math.max(
+    navigation.findIndex(({ href }) => isNavigationItemActive(pathname, href)),
+    0,
+  );
 
   if (publicRoutes.has(pathname)) return children;
 
@@ -74,13 +85,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const nav = (
-    <nav className="space-y-0.5" aria-label="Primary navigation">
-      {navigation.map(({ href, label, icon: Icon }) => {
-        const active =
-          href === "/dashboard"
-            ? pathname === href
-            : pathname.startsWith(href) ||
-              (href === "/monitoring" && pathname.startsWith("/analytics"));
+    <nav
+      className="playstation-nav relative isolate space-y-0.5"
+      aria-label="Primary navigation"
+      style={
+        {
+          "--nav-index": activeNavigationIndex,
+        } as CSSProperties
+      }
+    >
+      <span className="playstation-selection" aria-hidden="true" />
+      {navigation.map(({ href, label, icon: Icon }, index) => {
+        const active = index === activeNavigationIndex;
         return (
           <Link
             key={href}
@@ -92,18 +108,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               }
             }}
             aria-current={active ? "page" : undefined}
-            className={`group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-[color,background-color,transform] duration-150 active:scale-[0.985] ${
+            className={`playstation-nav-link group relative z-10 flex h-10 items-center gap-3 rounded-md px-3 text-sm outline-none transition-[color,transform] duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-[var(--accent-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sidebar)] ${
               active
-                ? "bg-[var(--accent)] font-semibold text-[var(--accent-contrast)]"
-                : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--foreground)]"
+                ? "font-semibold text-[var(--accent-contrast)]"
+                : "text-[var(--muted)] hover:translate-x-1 hover:text-[var(--foreground)]"
             }`}
           >
             <Icon
               size={17}
               strokeWidth={1.8}
-              className="transition-transform duration-150 group-hover:translate-x-0.5"
+              className={`shrink-0 transition-transform duration-200 ${
+                active ? "playstation-nav-icon" : "group-hover:scale-110"
+              }`}
             />
-            <span>{label}</span>
+            <span className={active ? "playstation-nav-label" : undefined}>
+              {label}
+            </span>
           </Link>
         );
       })}
