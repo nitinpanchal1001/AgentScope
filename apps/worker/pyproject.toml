@@ -22,7 +22,7 @@ override-dependencies = ["filelock>=4.2.1,<5"]
 dev = [
   "mypy>=1.14,<2",
   "pytest>=9.0.3,<10",
-  "ruff>=0.9,<1",
+  "ruff>=0.17.2,<1",
 ]
 
 [build-system]
