@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 WORKDIR /app
 RUN pip install --no-cache-dir uv==0.11.26
 COPY apps/api/pyproject.toml apps/api/uv.lock* ./

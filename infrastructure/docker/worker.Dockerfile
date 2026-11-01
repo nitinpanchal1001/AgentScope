@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 WORKDIR /workspace/apps/worker
 RUN pip install --no-cache-dir uv==0.11.26
 COPY packages/evaluation /workspace/packages/evaluation
